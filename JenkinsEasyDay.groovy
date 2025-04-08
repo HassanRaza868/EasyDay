@@ -1,0 +1,135 @@
+pipeline
+{
+    agent { label 'Staging Node Runner' }
+
+    environment
+    {
+        VIRTUAL_ENV = 'env'
+        GIT_URL = 'https://github.com/HassanRaza868/EasyDay.git'
+        BRANCH = 'main'
+        PATH = "/home/azureuser/allure/allure-2.17.3/bin:$PATH"
+        DISPLAY = ':99'
+    }
+     stages
+     {
+
+        stage('Get code from Git')
+        {
+            steps
+            {
+                withCredentials([string(credentialsId: 'git-Connect', variable: 'GITHUB_TOKEN')])
+                {
+                        sh 'rm -rf QA-Automation-Scripts'
+                        sh 'git clone https://${GITHUB_TOKEN}@github.com/HassanRaza868/EasyDay.git -b ${BRANCH}'
+                }
+                //git branch: "${BRANCH}",
+                //url: "${GIT_URL}",
+                //credentialsId: 'github-token'
+            }
+        }
+
+        stage('Setup Environment') {
+            steps {
+                script {
+                    try {
+                        sh '''
+                            cd EasyDay
+                            #!/bin/bash
+                            python3 -m venv ${VIRTUAL_ENV}
+                            . ${VIRTUAL_ENV}/bin/activate
+                        '''
+                    } catch (Exception e) {
+                        echo "Failed to create virtual environment: ${e.message}"
+                        error("Failed to create virtual environment")
+                    }
+                }
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                script {
+                    try {
+                        sh '''
+                            cd EasyDay
+                            #!/bin/bash
+                            . ${VIRTUAL_ENV}/bin/activate
+                            python3 -m pip install --upgrade pip
+                            pip install -r requirement.txt
+                            pip install allure-pytest
+                        '''
+                    } catch (Exception e) {
+                        echo "Failed to install dependencies: ${e.message}"
+                        error("Failed to install dependencies")
+                    }
+                }
+            }
+        }
+        stage('Install Allure') {
+            steps {
+                sh """
+                mkdir -p /home/azureuser/allure
+                wget -qO- https://github.com/allure-framework/allure2/releases/download/2.17.3/allure-2.17.3.tgz | tar -xz -C /home/azureuser/allure
+                export PATH=\$PATH:/home/azureuser/allure/allure-2.17.3/bin
+                """
+            }
+        }
+        stage('Run Tests') {
+            steps {
+                script {
+                    try {
+                        sh '''
+                            cd EasyDay
+                            #!/bin/bash
+                            . ${VIRTUAL_ENV}/bin/activate
+                            export PATH="$PATH:${CHROMEDRIVER_BINARY%/*}"
+                            Xvfb :99 -ac &  # Start Xvfb
+                            sleep 3  # Give Xvfb some time to start
+                            export DISPLAY=:99
+                            pytest tests --junitxml=reports/results.xml --html=reports/report.html --self-contained-html
+                        '''
+                    } catch (Exception e) {
+                        echo "Failed to run tests: ${e.message}"
+                        error("Failed to run tests")
+                    }
+                }
+            }
+        }
+
+        stage('allure Reports')
+        {
+            steps
+            {
+                sh """
+                cd EasyDay
+                /home/azureuser/allure/allure-2.17.3/bin/allure generate reports/allure-results --clean -o reports/allure-report
+                echo "Contents of allure-report directory:"
+                ls -R reports/allure-report
+                """
+            }
+        }
+
+        stage('Archive Reports')
+        {
+            steps
+            {
+                archiveArtifacts artifacts: 'EasyDay/reports/*.html, EasyDay/reports/*.xml', allowEmptyArchive: true
+                junit 'EasyDay/reports/results.xml'
+
+            }
+        }
+    }
+    post
+    {
+        always
+        {
+            archiveArtifacts artifacts: 'EasyDay/reports/*.html, reports/*.xml', allowEmptyArchive: true
+        }
+        success {
+            echo 'All tests passed!'
+        }
+        failure {
+            echo 'One or more tests failed.'
+        }
+    }
+}
