@@ -19,7 +19,7 @@ pipeline
             {
                 withCredentials([string(credentialsId: 'git-Connect', variable: 'GITHUB_TOKEN')])
                 {
-                        sh 'rm -rf QA-Automation-Scripts'
+                        sh 'rm -rf EasyDay'
                         sh 'git clone https://${GITHUB_TOKEN}@github.com/HassanRaza868/EasyDay.git -b ${BRANCH}'
                 }
                 //git branch: "${BRANCH}",
@@ -55,7 +55,7 @@ pipeline
                             #!/bin/bash
                             . ${VIRTUAL_ENV}/bin/activate
                             python3 -m pip install --upgrade pip
-                            pip install -r requirement.txt
+                            pip install -r requirements.txt
                             pip install allure-pytest
                         '''
                     } catch (Exception e) {
