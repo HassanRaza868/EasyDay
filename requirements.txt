@@ -13,7 +13,6 @@ dnspython==2.6.1
 dulwich==0.21.7
 exceptiongroup==1.2.0
 fastjsonschema==2.21.1
-filelock==3.17.0
 h11==0.14.0
 idna==3.6
 installer==0.7.0
